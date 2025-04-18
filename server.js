@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();  // Load environment variables
 const app = express();
 
 // Import routes
@@ -19,7 +20,7 @@ app.use('/api', salesRoutes);
 app.use('/api', dashboardRoutes);
 
 // MongoDB connection
-mongoose.connect('mongodb://localhost:27017/salesapp')
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.error('MongoDB Error:', err));
 
