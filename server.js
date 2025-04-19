@@ -1,29 +1,49 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
-require('dotenv').config();  // Load environment variables
+require('dotenv').config();
+
 const app = express();
 
-// Import routes
+// ✅ CORS options
+const corsOptions = {
+  origin: [
+    'http://localhost:5500',
+    'https://salesapp-backend-mpj2.onrender.com',
+    'file://'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Routes
 const authRoutes = require('./routes/auth');
 const salesRoutes = require('./routes/sales');
 const dashboardRoutes = require('./routes/dashboard');
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+app.use('/api/auth', authRoutes);
+app.use('/api/sales', salesRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
-// Use routes
-app.use('/api', authRoutes);
-app.use('/api', salesRoutes);
-app.use('/api', dashboardRoutes);
+// ✅ Error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : null
+  });
+});
 
-// MongoDB connection
+// ✅ MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => console.error('MongoDB Error:', err));
+  .catch(err => console.error('❌ MongoDB Error:', err));
 
-app.get('/', (req, res) => res.send('SalesApp Backend Running'));
-
-app.listen(5000, () => console.log('🚀 Backend running on http://localhost:5000'));
+// ✅ Server listen
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
