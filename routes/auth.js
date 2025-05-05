@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// ✅ Salesperson Registration Route
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
     const { email, password, name, phone, staffId } = req.body;
@@ -31,9 +31,10 @@ router.post('/register', async (req, res) => {
 
     await newUser.save();
 
+    // Replace JWT_SECRET with the secret key from your .env file
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET, // Use the JWT secret from environment variables
       { expiresIn: '1h' }
     );
 
