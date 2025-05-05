@@ -1,8 +1,11 @@
 const mongoose = require('mongoose');
 
 const complaintSchema = new mongoose.Schema({
-  staffId: String,
-  message: String,
+  productId: String,
+  issue: String,
+  salespersonId: String,
+  salespersonNumber:String,
+  vendorId: String,
   date: {
     type: Date,
     default: Date.now

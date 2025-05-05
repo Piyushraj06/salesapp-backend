@@ -1,67 +1,28 @@
-// routes/dashboard.js
 const express = require('express');
 const router = express.Router();
 const Sale = require('../models/Sale');
+const User = require('../models/User');
 
-// Bonus Logic
-function calculateBonus(units) {
-  if (units <= 0) return 0;
-  if (units <= 10) return units * 50;
-  if (units === 11) return 10 * 50 + 500;
-  return 10 * 50 + 500 + (units - 11) * 100;
-}
+// GET /api/dashboard
+router.get('/', async (req, res) => {
+    try {
+        // Get the total sales, vendors, and salespersons
+        const totalSales = await Sale.aggregate([
+            { $group: { _id: null, total: { $sum: "$amount" } } } // Assuming 'amount' field exists in Sale model
+        ]);
+        const totalVendors = await User.countDocuments({ role: 'vendor' });
+        const totalSalespersons = await User.countDocuments({ role: 'salesperson' });
 
-// Admin/Vendor Dashboard Route
-router.get('/sales', async (req, res) => {
-  try {
-    const sales = await Sale.find();
-
-    const summary = {};
-
-    for (const sale of sales) {
-      const date = sale.date.toISOString().split('T')[0];
-      const key = `${sale.deliveryStaffId}_${date}`;
-
-      if (!summary[key]) {
-        summary[key] = {
-          date,
-          staffId: sale.deliveryStaffId,
-          count: 0
-        };
-      }
-
-      summary[key].count += 1;
+        // Return data as a response
+        res.json({
+            totalSales: totalSales[0] ? totalSales[0].total : 0,  // If no sales, return 0
+            totalVendors,
+            totalSalespersons
+        });
+    } catch (error) {
+        console.error('Dashboard stats error:', error);
+        res.status(500).json({ message: 'Server error' });
     }
-
-    const dashboard = [];
-    let grandTotalBonus = 0;
-
-    for (const key in summary) {
-      const { staffId, date, count } = summary[key];
-      const bonus = calculateBonus(count);
-      grandTotalBonus += bonus;
-
-      dashboard.push({
-        staffId,
-        date,
-        unitsSold: count,
-        bonus
-      });
-    }
-
-    res.json({
-      dashboard,
-      grandTotalBonus
-    });
-  } catch (error) {
-    console.error('Error generating dashboard:', error);
-    res.status(500).json({ error: 'Failed to generate dashboard data' });
-  }
-});
-
-// Test route (Optional for development)
-router.get('/', (req, res) => {
-  res.json({ message: 'Dashboard route is working' });
 });
 
 module.exports = router;
