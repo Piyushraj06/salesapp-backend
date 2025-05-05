@@ -7,7 +7,7 @@ const app = express();
 
 // CORS Setup
 app.use(cors({
-  origin: 'https://doitiocl.netlify.app/',
+  origin: 'http://127.0.0.1:5500',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
