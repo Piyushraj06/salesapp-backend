@@ -7,16 +7,17 @@ const app = express();
 
 // CORS Setup
 const allowedOrigins = [
-  'http://127.0.0.1:5500',
+  'http://127.0.0.1:5500',  // VSCode Live Server or similar
+  'http://localhost:3000',   // React dev server or your local frontend port
   'http://localhost:8000',
   'http://192.168.1.30:8000',
   'http://192.168.0.129:8000',
-  'https://your-frontend-domain.com'  // <-- add your deployed frontend URL here
+  'https://your-frontend-domain.com'  // Add your deployed frontend URL here
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);  // allow requests like Postman with no origin
+    if (!origin) return callback(null, true);  // Allow Postman, curl, server-to-server requests
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
