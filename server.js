@@ -10,13 +10,13 @@ const allowedOrigins = [
   'http://127.0.0.1:5500',
   'http://localhost:8000',
   'http://192.168.1.30:8000',
-  'http://192.168.0.129:8000'  // ← your current frontend IP
+  'http://192.168.0.129:8000',
+  'https://your-frontend-domain.com'  // <-- add your deployed frontend URL here
 ];
-
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow requests like Postman or curl with no origin
+    if (!origin) return callback(null, true);  // allow requests like Postman with no origin
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -24,11 +24,10 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
 
 
 app.use(express.json());
