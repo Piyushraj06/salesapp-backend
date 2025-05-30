@@ -12,7 +12,7 @@ const allowedOrigins = [
   'http://localhost:8000',
   'http://192.168.1.30:8000',
   'http://192.168.0.129:8000',
-  'https://doit-iocl.netlify.app/'  // Add your deployed frontend URL here
+  'https://doit-iocl.netlify.app'  // Add your deployed frontend URL here
 ];
 
 app.use(cors({
