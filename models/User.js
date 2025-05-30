@@ -13,9 +13,14 @@ const userSchema = new mongoose.Schema({
       message: 'Phone number must be 10 digits'
     }
   },
+  upi: {
+  type: String,
+  required: true,
+  trim: true
+},
   role: {
     type: String,
-    enum: ['admin', 'vendor', 'salesperson'], // Ensure 'salesperson' is in the role enum
+    enum: ['admin', 'vendor', 'salesperson'],
     default: 'salesperson'
   }
 }, { timestamps: true });

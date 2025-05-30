@@ -9,6 +9,7 @@ const Vendor = require('../models/Vendor');
 const User = require('../models/User'); // salespeople too
 const Complaint = require('../models/Complaint');
 const QRAssignment = require('../models/QRAssignment');
+const ExcelJS = require('exceljs');
 
 // ✅ Middleware to protect admin routes
 const verifyAdmin = (req, res, next) => {
@@ -47,22 +48,37 @@ router.get('/sales-data', async (req, res) => {
 
     const sales = await Promise.all(
       data.map(async (entry) => {
-        // Fetch salesperson details using deliveryStaffId (which is staffId in User model)
+        // Fetch salesperson details
         const user = await User.findOne({ staffId: entry.deliveryStaffId });
+
+        // Fetch vendor details using vendorId stored in the sale (if available)
+        const vendor = entry.vendorId
+          ? await Vendor.findOne({ vendorId: entry.vendorId })
+          : null;
 
         return {
           _id: entry._id,
           date: entry.date,
-          productId: entry.productId,
-          salespersonId: entry.deliveryStaffId,
-          salespersonName: user?.name || 'Unknown',
-          salespersonPhone: user?.phone || 'Unknown',
-          stoveOrderId: entry.stoveOrderId,
+          productId: entry.productId || '-',
+          stoveOrderId: entry.stoveOrderId || '-',
           amount: entry.amount || '',
           upiTransactionId: entry.upiTransactionId || '',
-          staffUpiId: entry.staffUpiId || '',
           isConfirmed: Boolean(entry.isConfirmed),
-          status: entry.isConfirmed ? 'confirmed' : 'pending'
+          status: entry.isConfirmed ? 'confirmed' : 'pending',
+          customerName: entry.customerName,
+          customerNumber: entry.customerMobileNo,
+
+          // Salesperson info
+          salespersonId: entry.deliveryStaffId || '-',
+          salespersonName: user?.name || 'Unknown',
+          salespersonPhone: user?.phone || 'Unknown',
+          salespersonUpiId: user?.upi || 'Unknown',
+
+
+          // Vendor info
+          // vendorId: entry.vendorId || 'N/A',
+          // vendorName: vendor?.name || 'Unknown',
+          // vendorPhone: vendor?.phone || 'Unknown'
         };
       })
     );
@@ -75,16 +91,17 @@ router.get('/sales-data', async (req, res) => {
 });
 
 
-router.get('/confirmed-payments', verifyAdmin, async (req, res) => {
-  try {
-    const confirmed = await Sales.find({ status: 'confirmed' }).sort({ date: -1 });
-    res.json(confirmed);
-  } catch (err) {
-    res.status(500).json({ error: "Error fetching confirmed payments" });
-  }
-});
+// router.get('/confirmed-payments', verifyAdmin, async (req, res) => {
+//   try {
+//     const confirmed = await Sales.find({ status: 'confirmed' }).sort({ date: -1 });
+//     res.json(confirmed);
+//   } catch (err) {
+//     res.status(500).json({ error: "Error fetching confirmed payments" });
+//   }
+// });
 
 // 😡 Complaints
+
 router.get('/complaints', verifyAdmin, async (req, res) => {
   try {
     const complaints = await Complaint.find().sort({ date: -1 });
@@ -95,7 +112,6 @@ router.get('/complaints', verifyAdmin, async (req, res) => {
 });
 
 
-// 📦 Assign QR to Vendor (Manual Input by Admin)
 // 📦 Assign QR to Vendor (Manual Input by Admin)
 router.post('/admin/assign-qr', verifyAdmin, async (req, res) => {
   try {
@@ -143,8 +159,8 @@ router.post('/admin/assign-qr', verifyAdmin, async (req, res) => {
     const newQR = new QRAssignment({
       assignedBy: 'admin',
       vendorId,
-      // vendorName: vendor.name,       // ✅ Add vendor name
-      // vendorPhone: User.phone,       // ✅ Add vendor phone
+      // vendorName: vendor.name,     // ✅ Add vendor name
+      // vendorPhone: vendor.phone,       // ✅ Add vendor phone
       quantity,
       qrStart: qrStartInput,
       qrEnd: qrEndInput,
@@ -162,7 +178,6 @@ router.post('/admin/assign-qr', verifyAdmin, async (req, res) => {
     res.status(500).json({ error: "Server Error", message: error.message });
   }
 });
-
 
 
 // 🧾 Fetch QR Assigned by Vendor to Distributors
@@ -242,107 +257,272 @@ router.get('/global-search', async (req, res) => {
 });
 
 
+router.post('/verify-qr', async (req, res) => {
+  const { product_id, secret_code } = req.body;
+
+  try {
+    const sale = await Sale.findOne({ productId: product_id });
+
+    if (!sale) {
+      return res.json({ message: "ℹ️ Product not yet marked - Status: Unsold", status: "unsold" });
+    }
+
+    if (sale.secretCode === secret_code) {
+      return res.json({ message: "✅ Valid Secret Code - Status: Sold", status: "valid" });
+    } else {
+      return res.json({ message: "❌ Invalid Secret Code - Status: Invalid", status: "invalid" });
+    }
+
+  } catch (err) {
+    console.error("QR verify error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+// router.get('/export-sales', async (req, res) => {
+//   try {
+//     const sales = await Sale.find();
+
+//     const workbook = new ExcelJS.Workbook();
+//     const worksheet = workbook.addWorksheet("Sales");
+
+//     worksheet.columns = [
+//       { header: "Date", key: "date", width: 20 },
+//       { header: "Product ID", key: "productId", width: 20 },
+//       { header: "Salesperson ID", key: "deliveryStaffId", width: 20 },
+//       { header: "Salesperson Name", key: "staffName", width: 20 },
+//       { header: "Salesperson Number", key: "staffPhoneNumber", width: 20 },
+//       { header: "Units Sold", key: "unitsSold", width: 15 },
+//       { header: "Amount", key: "amount", width: 15 },
+//       { header: "UPI Transaction ID", key: "upiTransactionId", width: 25 },
+//       { header: "Status", key: "isConfirmed", width: 15 }
+//     ];
+
+//     sales.forEach((sale) => {
+//       worksheet.addRow({
+//         date: sale.date,
+//         productId: sale.productId,
+//         deliveryStaffId: sale.deliveryStaffId,
+//         staffName: sale.staffName,
+//         staffPhoneNumber: sale.staffPhoneNumber,
+//         unitsSold: 1,
+//         amount: sale.amount || "",
+//         upiTransactionId: sale.upiTransactionId || "",
+//         isConfirmed: sale.isConfirmed ? "Confirmed" : "Pending"
+//       });
+//     });
+
+//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//     res.setHeader('Content-Disposition', 'attachment; filename=SalesData.xlsx');
+
+//     await workbook.xlsx.write(res);
+//     res.end();
+//   } catch (error) {
+//     console.error("Excel download error:", error);
+//     res.status(500).send("Error generating Excel file.");
+//   }
+// });
+
+
+// ✅ Exports sales data to Excel
+router.get('/export-sales', async (req, res) => {
+  try {
+    const sales = await Sales.find();
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Sales Report");
+
+    worksheet.columns = [
+      { header: "Date", key: "date", width: 15 },
+      { header: "QR Code", key: "qrCode", width: 20 },                  // productId
+      { header: "Salesperson ID", key: "salespersonId", width: 20 },    // deliveryStaffId
+      { header: "Salesperson Name", key: "salespersonName", width: 25 },
+      { header: "Salesperson Number", key: "salespersonPhone", width: 20 },
+      { header: "Salesperson UPI ID", key: "upiId", width: 25 },
+      { header: "Customer Name", key: "customerName", width: 25 },
+      { header: "Customer Number", key: "customerPhone", width: 20 },
+      { header: "Product ID", key: "productId", width: 20 },            // stoveOrderId
+      { header: "Units Sold", key: "unitsSold", width: 12 },
+      { header: "Amount", key: "amount", width: 12 },
+      { header: "UPI Transaction ID", key: "upiTransactionId", width: 30 },
+      { header: "Status", key: "status", width: 15 }
+    ];
+
+    for (const sale of sales) {
+      const user = await User.findOne({ staffId: sale.deliveryStaffId });
+
+      worksheet.addRow({
+        date: sale.date.toISOString().split('T')[0],
+        qrCode: sale.productId || "-",                      // QR code
+        salespersonId: sale.deliveryStaffId || "-",
+        salespersonName: user?.name || "Unknown",
+        salespersonPhone: user?.phone || "Unknown",
+        customerName: sale.customerName || "Unknown",
+        customerPhone: sale.customerMobileNo|| "Unknown",
+        upiId: user?.upi || "Unknown",
+        productId: sale.stoveOrderId || "-",                // actual product ID
+        unitsSold: 1,
+        amount: sale.amount || "0",
+        upiTransactionId: sale.upiTransactionId || "N/A",
+        status: sale.isConfirmed ? "Confirmed" : "Pending"
+      });
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="SalesData.xlsx"');
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error("❌ Excel download error:", error);
+    res.status(500).send("Error generating Excel file.");
+  }
+});
+
+
+
 // ✏️ Update QR Assignment
-router.put('/qr-assignment/:id', verifyAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { vendorId, quantity, qrStart, qrEnd } = req.body;
+// router.put('/qr-assignment/:id', verifyAdmin, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { vendorId, quantity, qrStart, qrEnd } = req.body;
 
-    const qrCodePattern = /^PROD\d{5}$/;
-    if (!qrCodePattern.test(qrStart) || !qrCodePattern.test(qrEnd)) {
-      return res.status(400).json({ error: 'QR codes must follow format PROD00001' });
-    }
+//     const qrCodePattern = /^PROD\d{5}$/;
+//     if (!qrCodePattern.test(qrStart) || !qrCodePattern.test(qrEnd)) {
+//       return res.status(400).json({ error: 'QR codes must follow format PROD00001' });
+//     }
 
-    const updated = await QRAssignment.findByIdAndUpdate(id, {
-      vendorId,
-      quantity,
-      qrStart,
-      qrEnd
-    }, { new: true });
+//     const updated = await QRAssignment.findByIdAndUpdate(id, {
+//       vendorId,
+//       quantity,
+//       qrStart,
+//       qrEnd
+//     }, { new: true });
 
-    if (!updated) {
-      return res.status(404).json({ error: "QR assignment not found" });
-    }
+//     if (!updated) {
+//       return res.status(404).json({ error: "QR assignment not found" });
+//     }
 
-    res.json(updated);
-  } catch (err) {
-    console.error("Update QR error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+//     res.json(updated);
+//   } catch (err) {
+//     console.error("Update QR error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// });
 
-router.put('/admin-dashboard/qr-assignment/:id', verifyAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { vendorId, quantity, qrStart, qrEnd } = req.body;
+// router.put('/admin-dashboard/qr-assignment/:id', verifyAdmin, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { vendorId, quantity, qrStart, qrEnd } = req.body;
 
-    // Input validation
-    if (!vendorId || !quantity || !qrStart || !qrEnd) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
+//     // Input validation
+//     if (!vendorId || !quantity || !qrStart || !qrEnd) {
+//       return res.status(400).json({ error: "All fields are required" });
+//     }
 
-    const qrCodePattern = /^PROD\d{5}$/;
-    if (!qrCodePattern.test(qrStart) || !qrCodePattern.test(qrEnd)) {
-      return res.status(400).json({ error: 'QR codes must follow format PROD00001' });
-    }
+//     const qrCodePattern = /^PROD\d{5}$/;
+//     if (!qrCodePattern.test(qrStart) || !qrCodePattern.test(qrEnd)) {
+//       return res.status(400).json({ error: 'QR codes must follow format PROD00001' });
+//     }
 
-    const updated = await QRAssignment.findByIdAndUpdate(id, {
-      vendorId,
-      quantity,
-      qrStart,
-      qrEnd,
-      updatedAt: new Date()
-    }, { new: true });
+//     const updated = await QRAssignment.findByIdAndUpdate(id, {
+//       vendorId,
+//       quantity,
+//       qrStart,
+//       qrEnd,
+//       updatedAt: new Date()
+//     }, { new: true });
 
-    if (!updated) {
-      return res.status(404).json({ error: "QR assignment not found" });
-    }
+//     if (!updated) {
+//       return res.status(404).json({ error: "QR assignment not found" });
+//     }
 
-    res.json(updated);
-  } catch (err) {
-    console.error("Update QR error:", err);
-    res.status(500).json({ error: "Server error", message: err.message });
-  }
-});
+//     res.json(updated);
+//   } catch (err) {
+//     console.error("Update QR error:", err);
+//     res.status(500).json({ error: "Server error", message: err.message });
+//   }
+// });
 
 // ❌ Delete QR Assignment
-router.delete('/qr-assignment/:id', verifyAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleted = await QRAssignment.findByIdAndDelete(id);
+// router.delete('/qr-assignment/:id', verifyAdmin, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const deleted = await QRAssignment.findByIdAndDelete(id);
 
-    if (!deleted) {
-      return res.status(404).json({ error: "QR assignment not found" });
-    }
+//     if (!deleted) {
+//       return res.status(404).json({ error: "QR assignment not found" });
+//     }
 
-    res.json({ message: "QR assignment deleted successfully" });
-  } catch (err) {
-    console.error("Delete QR error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+//     res.json({ message: "QR assignment deleted successfully" });
+//   } catch (err) {
+//     console.error("Delete QR error:", err);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// });
 
-router.delete('/admin-dashboard/qr-assignment/:id', verifyAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
+// router.delete('/admin-dashboard/qr-assignment/:id', verifyAdmin, async (req, res) => {
+//   try {
+//     const { id } = req.params;
     
-    // Validate that id is a valid MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ error: "Invalid QR assignment ID format" });
-    }
+//     // Validate that id is a valid MongoDB ObjectId
+//     if (!mongoose.Types.ObjectId.isValid(id)) {
+//       return res.status(400).json({ error: "Invalid QR assignment ID format" });
+//     }
     
-    const deleted = await QRAssignment.findByIdAndDelete(id);
+//     const deleted = await QRAssignment.findByIdAndDelete(id);
 
-    if (!deleted) {
-      return res.status(404).json({ error: "QR assignment not found" });
-    }
+//     if (!deleted) {
+//       return res.status(404).json({ error: "QR assignment not found" });
+//     }
 
-    res.json({ message: "QR assignment deleted successfully" });
-  } catch (err) {
-    console.error("Delete QR error:", err);
-    res.status(500).json({ error: "Server error", message: err.message });
-  }
-});
+//     res.json({ message: "QR assignment deleted successfully" });
+//   } catch (err) {
+//     console.error("Delete QR error:", err);
+//     res.status(500).json({ error: "Server error", message: err.message });
+//   }
+// });
+
+// Get remaining QR for each vendor
+// router.get('/remaining-qr/vendor', async (req, res) => {
+//   try {
+//     const adminAssigned = await QRAssignment.find({ assignedBy: 'admin' });
+//     const vendorAssigned = await QRAssignment.find({ distributorId: { $exists: true } });
+
+//     const vendorTotals = {};
+
+//     // Count total assigned to vendor by admin
+//     for (let entry of adminAssigned) {
+//       const vendorId = entry.vendorId;
+//       if (!vendorTotals[vendorId]) vendorTotals[vendorId] = { total: 0, used: 0 };
+//       vendorTotals[vendorId].total += entry.quantity;
+//     }
+
+//     // Subtract distributor assignments
+//     for (let entry of vendorAssigned) {
+//       const vendorId = entry.vendorId;
+//       if (!vendorTotals[vendorId]) vendorTotals[vendorId] = { total: 0, used: 0 };
+//       vendorTotals[vendorId].used += entry.quantity;
+//     }
+
+//     // Prepare response
+//     const result = Object.entries(vendorTotals).map(([vendorId, stats]) => ({
+//       vendorId,
+//       totalAssigned: stats.total,
+//       assignedToDistributors: stats.used,
+//       remaining: stats.total - stats.used
+//     }));
+
+//     res.json(result);
+//   } catch (err) {
+//     console.error("Remaining QR calc error:", err);
+//     res.status(500).json({ message: "Server error calculating remaining QR" });
+//   }
+// });
+
+
 
 
 module.exports = router;

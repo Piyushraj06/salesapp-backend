@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const Sale = require('../models/Sale'); // Assuming Sale is your model for MongoDB
+const crypto = require('crypto'); 
+const Sale = require('../models/Sale');
 const User = require('../models/User');
 
 // POST endpoint to submit sale
+const SECRET_KEY = Buffer.from("YourSuperSecretKeyForQR"); // Same secret key bytes as Python
+
 router.post('/submit-sale', async (req, res) => {
   try {
     const {
@@ -14,36 +17,69 @@ router.post('/submit-sale', async (req, res) => {
       staff_phone_number,
       staff_name,
       staff_upi_id,
-      product_id
+      product_id,
+      secret_code,
+      sig,
+      timestamp
     } = req.body;
 
-    console.log("DELIVERY ID RECEIVED:", delivery_staff_id); // ✅ Debug line
+    // Log full request for debugging
+    // console.log('📝 Complete request body:', req.body);
 
+    // Validate signature presence
+    if (!secret_code || !sig) {
+      console.warn("⚠️ No signature or secret code provided");
+    } else {
+      // Signature verification -- SIGN ONLY delivery_staff_id (UUID)
+      const message = `${product_id}:${delivery_staff_id}:${timestamp}`;
+      const expectedSig = crypto.createHmac('sha256', SECRET_KEY)
+                          .update(message)
+                          .digest('hex');
+
+
+      console.log("🧪 Expected signature:", expectedSig);
+      console.log("📥 Received signature:", sig);
+
+      if (sig !== expectedSig) {
+        console.warn("⚠️ Signature mismatch detected");
+        // Optionally reject here:
+        // return res.status(403).json({ error: 'Invalid QR signature' });
+      }
+    }
+
+    // Prevent QR reuse by productId
     const exists = await Sale.findOne({ productId: product_id });
     if (exists) {
       return res.status(409).json({ error: 'QR already used' });
     }
 
+    // Save new sale including secretCode and qrSignature
     const sale = new Sale({
-      deliveryStaffId: delivery_staff_id, // ✅ Field used for dashboard 
-      staffName: User.name,
+      deliveryStaffId: delivery_staff_id,
+      staffName: staff_name || "N/A",
       customerName: customer_name,
       customerMobileNo: customer_mobile_no,
       stoveOrderId: stove_order_id,
       staffPhoneNumber: staff_phone_number,
       staffUpiId: staff_upi_id,
       productId: product_id,
-      isScanned: true
+      isScanned: true,
+      secretCode: secret_code,
+      qrSignature: sig
     });
 
-    await sale.save();
-    res.status(201).json({ message: 'Sale submitted successfully' });
+    const savedSale = await sale.save();
+
+    // console.log("💾 Saved to MongoDB:", savedSale);
+
+    return res.status(201).json({ message: 'Sale submitted successfully' });
 
   } catch (error) {
-    console.error('Submit Error:', error);
-    res.status(500).json({ error: 'Failed to submit sale' });
+    console.error('❌ Submit Error:', error);
+    return res.status(500).json({ error: 'Failed to submit sale' });
   }
 });
+
 
 
 // ✅ 2. Admin Route - Get All Sales (for Admin Dashboard)

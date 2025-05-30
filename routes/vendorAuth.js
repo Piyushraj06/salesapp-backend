@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Vendor = require('../models/Vendor'); // Make sure you have this model
 const router = express.Router();
+// const crypto = require('crypto');
+// const sendEmail = require('../utils/sendEmail'); // create this utility
 
 // Vendor Registration
 router.post('/register', async (req, res) => {
@@ -63,6 +65,31 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+//FORGET PASSWORD
+// router.post('/forgot-password', async (req, res) => {
+//   const { email } = req.body;
+
+//   try {
+//     const vendor = await Vendor.findOne({ email });
+//     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
+
+//     const token = crypto.randomBytes(32).toString('hex');
+//     vendor.resetToken = token;
+//     vendor.resetTokenExpires = Date.now() + 3600000;
+//     await vendor.save();
+
+//     const resetLink = `http://localhost:5500/reset-password.html?token=${token}&email=${email}&role=vendor`;
+//     await sendEmail(email, 'Reset Your Password', `<p>Click to reset: <a href="${resetLink}">${resetLink}</a></p>`);
+
+//     res.json({ message: 'Reset link sent to your email.' });
+
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: 'Server error' });
+//   }
+// });
+
 
 module.exports = router;
 

@@ -14,14 +14,16 @@ const saleSchema = new mongoose.Schema({
   productId: { type: String, unique: true, required: true },
   isScanned: { type: Boolean, default: false },
   staffName: {
-  type: String,
-  required: false
+    type: String,
+    required: false
   },
   bonus: { type: Number, default: 50 },
   date: { type: Date, default: Date.now },
   isConfirmed: { type: Boolean, default: false },
   amount: { type: String, default: '' },
-  upiTransactionId: { type: String, default: '' }
+  upiTransactionId: { type: String, default: '' },
+  secretCode: { type: String },
+  qrSignature: { type: String }
 });
 
 module.exports = mongoose.model('Sale', saleSchema);

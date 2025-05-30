@@ -287,6 +287,7 @@ router.get('/dashboard/scanned-qr-data', authenticateVendor, async (req, res) =>
           salespersonId: sale.deliveryStaffId,
           salespersonName: user?.name || 'Unknown',
           salespersonPhone: user?.phone || 'Unknown',
+          salespersonUpiId: user?.upi || 'Unknown',
           productId: sale.stoveOrderId,
           unitsSold: 1,
           amount: sale.amount || '',

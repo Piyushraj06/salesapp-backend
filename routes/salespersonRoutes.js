@@ -29,6 +29,7 @@ router.get('/sales', authenticateSalesperson, async (req, res) => {
     const user = await User.findOne({ staffId: salespersonId });
     const salespersonName = user?.name || 'Unknown';
     const salespersonPhone = user?.phone || 'Unknown';
+    const salespersonUpiId = user?.upi || 'Unknown';
 
     const data = await Sale.find({ deliveryStaffId: salespersonId }).sort({ date: -1 });
 
@@ -39,6 +40,7 @@ router.get('/sales', authenticateSalesperson, async (req, res) => {
       salespersonId: entry.deliveryStaffId,
       salespersonName, // ✅ fetched from User model
       salespersonPhone, // ✅ fetched from User model
+      salespersonUpiId,
       stoveOrderId: entry.stoveOrderId,
       amount: entry.amount || '',
       upiTransactionId: entry.upiTransactionId || '',

@@ -1,60 +1,26 @@
-// routes/auth.js
+// routes/adminLogin.js or inside auth controller
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 
-// Hardcoded admin credentials
-const ADMIN_EMAIL = "admin@example.com"; // Change to your admin email
-const ADMIN_PASSWORD = "admin123"; // Change to your preferred password
+const ADMIN_USERS = [
+  { email: 'sido.indane@gmail.com', password: 'Sidoindane@2025'},
+  { email: 'sido1@gmail.com', password: 'Sido@123' },
+  { email: 'admin1@gmail.com', password: 'Admin@123' }
+];
 
-// Admin login route
-router.post('/admin/login', (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    // Simple validation
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
+router.post('/login', (req, res) => {
+  const { email, password } = req.body;
 
-    // Check against hardcoded credentials
-    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+  const admin = ADMIN_USERS.find(u => u.email === email && u.password === password);
 
-    // Generate JWT token with 24-hour expiration
-    const token = jwt.sign(
-      { role: 'admin' },
-      process.env.JWT_SECRET || 'your-secret-key-here',
-      { expiresIn: '24h' }
-    );
-
-    // Return success with token
-    res.json({
-      message: "Login successful",
-      user: { role: 'admin' },
-      token
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Server error" });
+  if (!admin) {
+    return res.status(401).json({ error: 'Invalid admin credentials' });
   }
+
+  const token = jwt.sign({ email, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '2h' });
+
+  res.json({ token });
 });
 
-// Admin token verification middleware
-const verifyAdmin = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key-here');
-    if (decoded.role !== 'admin') return res.status(403).json({ error: "Access denied" });
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("Token verification error:", err);
-    res.status(401).json({ error: "Invalid or expired token" });
-  }
-};
-
-module.exports = { router, verifyAdmin };
+module.exports = router;
